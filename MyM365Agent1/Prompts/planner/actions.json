@@ -1,0 +1,100 @@
+[
+    {
+        "name": "createTask",
+        "description": "Create a new task with title and description",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the task to create"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "The detailed description of the task to create"
+                }
+            },
+            "required": [
+                "title",
+                "description"
+            ]
+        }
+    },
+    {
+        "name": "deleteTask",
+        "description": "Delete an existing task",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the task to delete"
+                }
+            },
+            "required": [
+                "title"
+            ]
+        }
+    },
+    {
+        "name": "postToExternalApi",
+        "description": "Make an HTTP POST request to an external API with bearer token authentication",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "endpoint": {
+                    "type": "string",
+                    "description": "The API endpoint path (relative to the base URL configured in settings)"
+                },
+                "data": {
+                    "type": "object",
+                    "description": "The data object to send in the POST request body"
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Optional additional headers to include in the request (as JSON object)"
+                }
+            },
+            "required": [
+                "endpoint",
+                "data"
+            ]
+        }
+    },
+    {
+        "name": "getEventDetails",
+        "description": "Get detailed information about an event using its event ID via GraphQL query",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "eventId": {
+                    "type": "integer",
+                    "description": "The numeric ID of the event to retrieve details for"
+                }
+            },
+            "required": [
+                "eventId"
+            ]
+        }
+    },
+    {
+        "name": "executeGraphQLQuery",
+        "description": "Execute a custom GraphQL query with optional variables",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The GraphQL query string to execute"
+                },
+                "variables": {
+                    "type": "object",
+                    "description": "Optional variables for the GraphQL query (as JSON object)"
+                }
+            },
+            "required": [
+                "query"
+            ]
+        }
+    }
+]
