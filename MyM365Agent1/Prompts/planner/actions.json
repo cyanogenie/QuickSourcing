@@ -1,100 +1,99 @@
 [
     {
-        "name": "createTask",
-        "description": "Create a new task with title and description",
+        "name": "createSourcingProject",
+        "description": "PRIMARY ACTION: Create a sourcing project using text-based input. Use this IMMEDIATELY when user mentions: 'create', 'new project', 'start project', 'make project', 'sourcing project', or ANY intent to create a project. Parse project details from natural language input.",
         "parameters": {
             "type": "object",
             "properties": {
-                "title": {
+                "input": {
                     "type": "string",
-                    "description": "The title of the task to create"
+                    "description": "User's project details including title, description, email address, start/end dates, and budget"
+                }
+            },
+            "required": [
+                "input"
+            ]
+        }
+    },
+    {
+        "name": "showProjectForm",
+        "description": "DISABLED ACTION: Do not use this action. It has been disabled in favor of text-based project creation. Always use createSourcingProject instead.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "submitProjectForm",
+        "description": "Process submitted adaptive card form data to create a sourcing project. This is automatically triggered when user submits the project form.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "projectTitle": {
+                    "type": "string",
+                    "description": "Project title from the form"
                 },
                 "description": {
                     "type": "string",
-                    "description": "The detailed description of the task to create"
-                }
-            },
-            "required": [
-                "title",
-                "description"
-            ]
-        }
-    },
-    {
-        "name": "deleteTask",
-        "description": "Delete an existing task",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "The title of the task to delete"
-                }
-            },
-            "required": [
-                "title"
-            ]
-        }
-    },
-    {
-        "name": "postToExternalApi",
-        "description": "Make an HTTP POST request to an external API with bearer token authentication",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "The API endpoint path (relative to the base URL configured in settings)"
+                    "description": "Project description from the form"
                 },
-                "data": {
-                    "type": "object",
-                    "description": "The data object to send in the POST request body"
-                },
-                "headers": {
-                    "type": "object",
-                    "description": "Optional additional headers to include in the request (as JSON object)"
-                }
-            },
-            "required": [
-                "endpoint",
-                "data"
-            ]
-        }
-    },
-    {
-        "name": "getEventDetails",
-        "description": "Get detailed information about an event using its event ID via GraphQL query",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "eventId": {
-                    "type": "integer",
-                    "description": "The numeric ID of the event to retrieve details for"
-                }
-            },
-            "required": [
-                "eventId"
-            ]
-        }
-    },
-    {
-        "name": "executeGraphQLQuery",
-        "description": "Execute a custom GraphQL query with optional variables",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
+                "email": {
                     "type": "string",
-                    "description": "The GraphQL query string to execute"
+                    "description": "Email address from the form"
                 },
-                "variables": {
-                    "type": "object",
-                    "description": "Optional variables for the GraphQL query (as JSON object)"
+                "startDate": {
+                    "type": "string",
+                    "description": "Start date from the form"
+                },
+                "endDate": {
+                    "type": "string",
+                    "description": "End date from the form"
+                },
+                "budget": {
+                    "type": "number",
+                    "description": "Budget amount from the form"
+                }
+            },
+            "required": ["projectTitle", "description", "email", "startDate", "endDate", "budget"]
+        }
+    },
+    {
+        "name": "cancelProjectForm",
+        "description": "Handle cancellation of the project form by the user",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "upsertMilestones",
+        "description": "Add or update project milestones and deliverables for an existing sourcing project",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "User's milestone details with titles and delivery dates"
                 }
             },
             "required": [
-                "query"
+                "input"
             ]
+        }
+    },
+    {
+        "name": "resetWorkflow",
+        "description": "Reset the entire workflow and start over from the beginning",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Optional reason for resetting the workflow"
+                }
+            }
         }
     }
 ]

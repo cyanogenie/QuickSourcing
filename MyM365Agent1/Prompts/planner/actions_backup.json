@@ -1,0 +1,127 @@
+[
+    {
+        "name": "collectUserEmail",
+        "description": "Extract and validate user email address from the message to start the workflow",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "description": "The email address extracted from the user's message"
+                }
+            },
+            "required": [
+                "email"
+            ]
+        }
+    },
+    {
+        "name": "submitUserDetails",
+        "description": "Submit user details to create a new order after email has been collected",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean",
+                    "description": "Whether the user wants to proceed with submitting details",
+                    "default": true
+                }
+            }
+        }
+    },
+    {
+        "name": "confirmOrder",
+        "description": "Confirm an existing order that has been created",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "orderId": {
+                    "type": "string",
+                    "description": "The order ID to confirm"
+                }
+            },
+            "required": [
+                "orderId"
+            ]
+        }
+    },
+    {
+        "name": "cancelOrder",
+        "description": "Cancel an existing order",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "orderId": {
+                    "type": "string",
+                    "description": "The order ID to cancel"
+                }
+            },
+            "required": [
+                "orderId"
+            ]
+        }
+    },
+    {
+        "name": "resetWorkflow",
+        "description": "Reset the entire workflow and start over from the beginning",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Optional reason for resetting the workflow"
+                }
+            }
+        }
+    }
+]
+                    "description": "The data object to send in the POST request body"
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Optional additional headers to include in the request (as JSON object)"
+                }
+            },
+            "required": [
+                "endpoint",
+                "data"
+            ]
+        }
+    },
+    {
+        "name": "getEventDetails",
+        "description": "Get detailed information about an event using its event ID via GraphQL query",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "eventId": {
+                    "type": "integer",
+                    "description": "The numeric ID of the event to retrieve details for"
+                }
+            },
+            "required": [
+                "eventId"
+            ]
+        }
+    },
+    {
+        "name": "executeGraphQLQuery",
+        "description": "Execute a custom GraphQL query with optional variables",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The GraphQL query string to execute"
+                },
+                "variables": {
+                    "type": "object",
+                    "description": "Optional variables for the GraphQL query (as JSON object)"
+                }
+            },
+            "required": [
+                "query"
+            ]
+        }
+    }
+]

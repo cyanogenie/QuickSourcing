@@ -112,6 +112,7 @@ namespace MyM365Agent1
             }
         }
 
+        /*
         [Action("getEventDetails")]
         public async Task<string> OnGetEventDetails([ActionTurnContext] ITurnContext turnContext, [ActionTurnState] AppState state, [ActionParameters] Dictionary<string, object> entities)
         {
@@ -160,6 +161,7 @@ namespace MyM365Agent1
                 return "Failed to retrieve event details, think about your next action";
             }
         }
+        */
 
         [Action("executeGraphQLQuery")]
         public async Task<string> OnExecuteGraphQLQuery([ActionTurnContext] ITurnContext turnContext, [ActionTurnState] AppState state, [ActionParameters] Dictionary<string, object> entities)

@@ -5,8 +5,17 @@ namespace MyM365Agent1.Services
 {
     public interface IGraphQLService
     {
-        Task<string> GetEventDetailsAsync(int eventId);
-        Task<string> ExecuteQueryAsync(string query, object? variables = null);
+        Task<string> CreateSourcingProjectAsync(string projectTitle, string engagementDescription, 
+            DateTime engagementStartDate, DateTime engagementEndDate, string engagementId, 
+            decimal approxTotalBudget, string requestorAlias);
+        Task<string> UpsertMilestonesAsync(string engagementId, List<ProjectMilestone> milestones);
+        Task<string> ExecuteQueryAsync(string query, object? variables = null, string? customBaseUrl = null);
+    }
+
+    public class ProjectMilestone
+    {
+        public string Title { get; set; } = string.Empty;
+        public DateTime DeliveryDate { get; set; }
     }
 
     public class GraphQLService : IGraphQLService
@@ -22,57 +31,92 @@ namespace MyM365Agent1.Services
             _logger = logger;
         }
 
-        public async Task<string> GetEventDetailsAsync(int eventId)
+        public async Task<string> CreateSourcingProjectAsync(string projectTitle, string engagementDescription, 
+            DateTime engagementStartDate, DateTime engagementEndDate, string engagementId, 
+            decimal approxTotalBudget, string requestorAlias)
         {
             var query = @"
-                query($eventId: Int!) {
-                    eventDetails(eventId: $eventId) {
-                        eventId
-                        microsoftSupplierId
-                        companyCode
-                        country
-                        currency
-                        programName
-                        eventTitle
-                        projectType
-                        eventStatus
-                        lastAction
-                        isSystemProcfessing
-                        systemProcessingAction
-                        supplierName
-                        supplierLegalName
-                        supplierUvpName
-                        inCountrySupplierContact {
-                            firstName
-                            lastName
-                            email
-                        }
-                        supplierType
-                        supplierCcContactEmail
-                        supplierAdminContacts
-                        owner
-                        eventRequestor
-                        msContactEmail
-                        msCcContactEmail
-                        approver
+                mutation {
+                  createProject(
+                    input: {
+                      projectTitle: """ + projectTitle + @"""
+                      engagementDescription: """ + engagementDescription + @"""
+                      projectTypeId: 1
+                      engagementStartDate: """ + engagementStartDate.ToString("yyyy-MM-ddTHH:mm:ss.fffZ") + @"""
+                      engagementEndDate: """ + engagementEndDate.ToString("yyyy-MM-ddTHH:mm:ss.fffZ") + @"""
+                      engagementId: """ + engagementId + @"""
+                      engagementCompanyCode: ""1010""
+                      engagementCategory: ""Consulting Services""
+                      engagementCapability: ""IT Consulting""
+                      currencyCode: ""USD""
+                      approxTotalBudget: " + approxTotalBudget + @"
+                      requestorAlias: """ + requestorAlias + @"""
+                      businessSponsorAlias: """ + requestorAlias + @"""
                     }
+                  ) {
+                    projectId
+                    projectStatus
+                    engagementId
+                  }
                 }";
 
-            var variables = new { eventId = eventId };
-            return await ExecuteQueryAsync(query, variables);
+            var createProjectUrl = _configuration["GraphQLEndpoints:ProjectManagement:BaseUrl"] + "?tenant=QuickSourcing?action=createProject&tenantName=QuickSourcing";
+            return await ExecuteQueryAsync(query, null, createProjectUrl);
         }
 
-        public async Task<string> ExecuteQueryAsync(string query, object? variables = null)
+        public async Task<string> UpsertMilestonesAsync(string engagementId, List<ProjectMilestone> milestones)
+        {
+            var milestonesJson = string.Join(", ", milestones.Select(m => 
+                $@"{{ title: ""{m.Title}"", deliveryDate: ""{m.DeliveryDate:yyyy-MM-ddTHH:mm:ss.fffZ}"" }}"));
+
+            var query = $@"
+                mutation {{
+                  upsertEngagementInfo(
+                    input: {{input: {{
+                      engagementId: ""{engagementId}""
+                      categoryId: ""18""
+                      categoryName: ""Consulting Services""
+                      sourcingDescription: """"
+                      engagementMilestones: [
+                        {milestonesJson}
+                      ]
+                    }}}}
+                  ) {{
+                    engagementMilestoneResponse {{
+                      engagementId
+                      engagementMilestones {{
+                        title
+                        deliveryDate
+                      }}
+                    }}
+                  }}
+                }}";
+
+            var milestonesUrl = _configuration["GraphQLEndpoints:RFXGeneration:BaseUrl"] + "?tenant=QuickSourcing?action=saveProjectDeliverablesAsync&tenantName=QuickSourcing";
+            return await ExecuteQueryAsync(query, null, milestonesUrl);
+        }
+
+        public async Task<string> ExecuteQueryAsync(string query, object? variables = null, string? customBaseUrl = null)
         {
             try
             {
-                // Get configuration
-                var baseUrl = _configuration["ExternalApi:BaseUrl"];
-                var bearerToken = _configuration["ExternalApi:BearerToken"];
+                // Get configuration - use custom URL if provided, otherwise fallback to config
+                var baseUrl = customBaseUrl ?? _configuration["ExternalApi:BaseUrl"];
+                string bearerToken;
+
+                // Determine which bearer token to use based on the URL
+                if (!string.IsNullOrEmpty(customBaseUrl))
+                {
+                    bearerToken = GetBearerTokenForUrl(customBaseUrl);
+                }
+                else
+                {
+                    bearerToken = _configuration["ExternalApi:BearerToken"] ?? string.Empty;
+                }
 
                 if (string.IsNullOrEmpty(bearerToken))
                 {
-                    throw new InvalidOperationException("Bearer token is not configured.");
+                    throw new InvalidOperationException($"Bearer token is not configured for URL: {baseUrl}");
                 }
 
                 if (string.IsNullOrEmpty(baseUrl))
@@ -139,6 +183,29 @@ namespace MyM365Agent1.Services
                 _logger.LogError(ex, $"Error executing GraphQL query");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Gets the appropriate bearer token for a given URL based on configuration
+        /// </summary>
+        private string GetBearerTokenForUrl(string url)
+        {
+            // Check for project management endpoint
+            var projectMgmtUrl = _configuration["GraphQLEndpoints:ProjectManagement:BaseUrl"];
+            if (!string.IsNullOrEmpty(projectMgmtUrl) && url.Contains(projectMgmtUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return _configuration["GraphQLEndpoints:ProjectManagement:BearerToken"] ?? string.Empty;
+            }
+
+            // Check for RFX generation endpoint
+            var rfxUrl = _configuration["GraphQLEndpoints:RFXGeneration:BaseUrl"];
+            if (!string.IsNullOrEmpty(rfxUrl) && url.Contains(rfxUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return _configuration["GraphQLEndpoints:RFXGeneration:BearerToken"] ?? string.Empty;
+            }
+
+            // Fallback to default external API token
+            return _configuration["ExternalApi:BearerToken"] ?? string.Empty;
         }
     }
 }
