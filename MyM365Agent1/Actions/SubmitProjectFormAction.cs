@@ -27,6 +27,17 @@ namespace MyM365Agent1.Actions
             [ActionTurnState] AppState state, 
             [ActionParameters] Dictionary<string, object> parameters)
         {
+            // FORM ACTION DISABLED - This action has been disabled in favor of text-based project creation
+            await turnContext.SendActivityAsync("❌ Form submission is disabled. Please use text-based project creation instead. Say 'create project' to get started.");
+            return "Form action disabled - redirected to text-based flow";
+        }
+
+        /* ORIGINAL IMPLEMENTATION COMMENTED OUT
+        public async Task<string> ExecuteAsyncOriginal(
+            [ActionTurnContext] ITurnContext turnContext, 
+            [ActionTurnState] AppState state, 
+            [ActionParameters] Dictionary<string, object> parameters)
+        {
             try
             {
                 _logger.LogInformation("🎯 SubmitProjectFormAction CALLED - Processing project form submission");
@@ -337,5 +348,6 @@ namespace MyM365Agent1.Actions
             public bool IsValid { get; set; }
             public string ErrorMessage { get; set; } = "";
         }
+        */
     }
 }

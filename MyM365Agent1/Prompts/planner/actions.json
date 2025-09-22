@@ -16,58 +16,6 @@
         }
     },
     {
-        "name": "showProjectForm",
-        "description": "DISABLED ACTION: Do not use this action. It has been disabled in favor of text-based project creation. Always use createSourcingProject instead.",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    },
-    {
-        "name": "submitProjectForm",
-        "description": "Process submitted adaptive card form data to create a sourcing project. This is automatically triggered when user submits the project form.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "projectTitle": {
-                    "type": "string",
-                    "description": "Project title from the form"
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Project description from the form"
-                },
-                "email": {
-                    "type": "string",
-                    "description": "Email address from the form"
-                },
-                "startDate": {
-                    "type": "string",
-                    "description": "Start date from the form"
-                },
-                "endDate": {
-                    "type": "string",
-                    "description": "End date from the form"
-                },
-                "budget": {
-                    "type": "number",
-                    "description": "Budget amount from the form"
-                }
-            },
-            "required": ["projectTitle", "description", "email", "startDate", "endDate", "budget"]
-        }
-    },
-    {
-        "name": "cancelProjectForm",
-        "description": "Handle cancellation of the project form by the user",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    },
-    {
         "name": "upsertMilestones",
         "description": "Add or update project milestones and deliverables for an existing sourcing project",
         "parameters": {
@@ -84,6 +32,81 @@
         }
     },
     {
+        "name": "findSuppliers",
+        "description": "MILESTONE COMPLETION ACTION: Find suitable suppliers for the sourcing project. Use this IMMEDIATELY after milestones are created or when user asks to 'find suppliers', 'search suppliers', 'get vendors', 'recommend suppliers', or ANY intent to find vendors for the project.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Optional additional criteria for supplier search"
+                }
+            }
+        }
+    },
+    {
+        "name": "selectSuppliers",
+        "description": "SUPPLIER SELECTION ACTION: Select specific suppliers from the found list. Use when user indicates which suppliers they want to select from the recommendations.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "selectedSuppliers": {
+                    "type": "string",
+                    "description": "User's supplier selection details or supplier numbers"
+                }
+            },
+            "required": [
+                "selectedSuppliers"
+            ]
+        }
+    },
+    {
+        "name": "publishProject",
+        "description": "FINAL ACTION: Show project publication details and ask for confirmation. Use when user wants to 'publish', 'finalize', 'complete', or 'submit' the project.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean",
+                    "description": "Whether user confirms publishing",
+                    "default": true
+                }
+            }
+        }
+    },
+    {
+        "name": "confirmPublishProject",
+        "description": "CONFIRMATION ACTION: Execute project publication when user confirms. Use when user responds with 'yes', 'confirm', 'proceed', or similar confirmation to publish.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "User confirmation to proceed with publishing"
+                }
+            },
+            "required": [
+                "confirmed"
+            ]
+        }
+    },
+    {
+        "name": "confirmPublish",
+        "description": "Alternative confirmation action for project publication. Use when user confirms publishing the project.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "User confirmation to proceed with publishing"
+                }
+            },
+            "required": [
+                "confirmed"
+            ]
+        }
+    },
+    {
         "name": "resetWorkflow",
         "description": "Reset the entire workflow and start over from the beginning",
         "parameters": {
@@ -92,6 +115,19 @@
                 "reason": {
                     "type": "string",
                     "description": "Optional reason for resetting the workflow"
+                }
+            }
+        }
+    },
+    {
+        "name": "showSuppliers",
+        "description": "Display the list of available suppliers that have been found for the project. Use this when user requests to view, show, display, or see suppliers. Only works after suppliers have been found.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Optional user input for showing suppliers"
                 }
             }
         }

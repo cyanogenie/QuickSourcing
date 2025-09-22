@@ -5,6 +5,7 @@ using MyM365Agent1.Model;
 using MyM365Agent1.Services;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MyM365Agent1.Actions
 {
@@ -39,32 +40,19 @@ namespace MyM365Agent1.Actions
                     return "Action not available in current workflow step";
                 }
 
-                // Enhanced: Use the new API response persistence pattern
-                // Try to get engagement ID from the previous step's API response first
-                var createProjectResponse = state.User.GetApiResponse("createSourcingProject");
-                var engagementId = state.User.EngagementId; // Fallback to existing property
+                // Get engagement ID and project details from simple state properties
+                var engagementId = state.User.EngagementId;
+                var projectTitle = state.User.ProjectTitle ?? "Project";
+                var projectId = state.User.ProjectId;
 
-                if (createProjectResponse != null && createProjectResponse.IsSuccess)
-                {
-                    engagementId = state.User.GetApiResponseValue<string>("createSourcingProject", "engagementId") ?? engagementId;
-                    _logger.LogInformation("📦 Retrieved engagement ID from API response history: {EngagementId}", engagementId);
-                    Console.WriteLine($"📦 Retrieved engagement ID from API response history: {engagementId}");
-                }
-                else
-                {
-                    _logger.LogInformation("📦 Using engagement ID from state properties: {EngagementId}", engagementId);
-                    Console.WriteLine($"📦 Using engagement ID from state properties: {engagementId}");
-                }
+                _logger.LogInformation("📦 Retrieved data from state - ProjectTitle: {ProjectTitle}, ProjectId: {ProjectId}, EngagementId: {EngagementId}", 
+                    projectTitle, projectId, engagementId);
 
                 if (string.IsNullOrEmpty(engagementId))
                 {
                     await turnContext.SendActivityAsync("❌ No engagement ID found. Please create a sourcing project first.");
                     return "Missing engagement ID";
                 }
-
-                // Get additional context from the create project response for better milestone creation
-                var projectTitle = state.User.GetApiResponseValue<string>("createSourcingProject", "projectTitle") ?? "Project";
-                var projectId = state.User.GetApiResponseValue<string>("createSourcingProject", "projectId") ?? state.User.ProjectId;
 
                 _logger.LogInformation("📦 Cross-step data retrieved - ProjectTitle: {ProjectTitle}, ProjectId: {ProjectId}", 
                     projectTitle, projectId);
@@ -82,7 +70,9 @@ namespace MyM365Agent1.Actions
                     return "No milestones found";
                 }
 
-                await turnContext.SendActivityAsync($"🔄 Adding {milestones.Count} milestones to your sourcing project **{projectTitle}**...");
+                // Use proper grammar for singular/plural
+                var milestoneText = milestones.Count == 1 ? "milestone" : "milestones";
+                await turnContext.SendActivityAsync($"🔄 Adding {milestones.Count} {milestoneText} to your sourcing project **{projectTitle}**...");
 
                 // Call GraphQL service to upsert milestones
                 var response = await _graphQLService.UpsertMilestonesAsync(engagementId, milestones);
@@ -105,10 +95,15 @@ namespace MyM365Agent1.Actions
                         ["projectTitle"] = projectTitle
                     };
 
-                    var responseText = $"✅ **Milestones added successfully!**\n\n" +
-                        $"📋 **Project:** {projectId}\n" +
-                        $"🎯 **Engagement ID:** {responseEngagementId}\n\n" +
-                        $"**Confirmed Milestones:**\n";
+                    var responseText = $"🎯 **Milestones Added Successfully!**\n\n" +
+                        $"┌─────────────────────────────────────────────────────────────┐\n" +
+                        $"│                📋 **MILESTONE OVERVIEW**                    │\n" +
+                        $"└─────────────────────────────────────────────────────────────┘\n\n" +
+                        $"🆔 **Project ID:** `{projectId}`\n" +
+                        $"🔗 **Engagement ID:** `{responseEngagementId}`\n\n" +
+                        $"📅 **Confirmed Project Milestones:**\n\n" +
+                        $"| **Milestone Description** | **Delivery Date** |\n" +
+                        $"|---------------------------|-------------------|\n";
 
                     // Parse and display the actual milestones returned from the API
                     var addedMilestonesCount = 0;
@@ -125,11 +120,11 @@ namespace MyM365Agent1.Actions
                             
                             if (DateTime.TryParse(deliveryDateStr, out var deliveryDate))
                             {
-                                responseText += $"• **{title}** - Due: {deliveryDate:yyyy-MM-dd}\n";
+                                responseText += $"| {title} | {deliveryDate:yyyy-MM-dd} |\n";
                             }
                             else
                             {
-                                responseText += $"• **{title}** - Due: {deliveryDateStr}\n";
+                                responseText += $"| {title} | {deliveryDateStr} |\n";
                             }
                             addedMilestonesCount++;
                         }
@@ -140,37 +135,49 @@ namespace MyM365Agent1.Actions
                     {
                         foreach (var milestone in milestones)
                         {
-                            responseText += $"• **{milestone.Title}** - Due: {milestone.DeliveryDate:yyyy-MM-dd}\n";
+                            responseText += $"| {milestone.Title} | {milestone.DeliveryDate:yyyy-MM-dd} |\n";
                             addedMilestonesCount++;
                         }
                     }
 
+                    // Add table summary
+                    responseText += $"\n📊 **Total: {addedMilestonesCount} milestone{(addedMilestonesCount == 1 ? "" : "s")} confirmed**\n";
+
                     // Add milestone details to parsed data
                     parsedData["addedMilestonesCount"] = addedMilestonesCount;
-                    parsedData["milestoneDetails"] = milestones.Select(m => new { m.Title, m.DeliveryDate }).ToList();
+                    parsedData["milestoneDetails"] = milestones.Select(m => new MilestoneData { Title = m.Title, DeliveryDate = m.DeliveryDate }).ToList();
 
                     // Update workflow state to MILESTONES_CREATED
                     state.User.CurrentStep = WorkflowStep.MILESTONES_CREATED;
                     state.User.LastActivityTime = DateTime.UtcNow;
 
-                    // Store API response in history for potential future steps
-                    state.User.AddApiResponse("upsertMilestones", WorkflowStep.MILESTONES_CREATED, response, parsedData, true);
+                    // Store milestones data as simple JSON string to avoid serialization issues
+                    if (parsedData.ContainsKey("milestones"))
+                    {
+                        state.User.MilestonesJson = parsedData["milestones"].ToString();
+                    }
 
-                    _logger.LogInformation("📦 API response stored in history. Added {Count} milestones", addedMilestonesCount);
+                    // API response history storage removed to prevent serialization issues
+
+                    _logger.LogInformation("📦 Milestones data stored as simple JSON. Added {Count} milestones", addedMilestonesCount);
                     _logger.LogInformation("🔄 Workflow state updated to MILESTONES_CREATED");
-                    Console.WriteLine($"📦 API response stored in history. Added {addedMilestonesCount} milestones");
+                    Console.WriteLine($"📦 Milestones data stored as simple JSON. Added {addedMilestonesCount} milestones");
                     Console.WriteLine($"🔄 Workflow state updated to MILESTONES_CREATED");
 
-                    responseText += "\n🚀 Your sourcing project is now ready with milestones defined!";
-                    responseText += "\n\n🎯 **Next Step:** Ready for RFX summary generation.";
+                    responseText += "\n─────────────────────────────────────────────────────────────\n";
+                    responseText += "\n🚀 **Project Setup Complete!** Your sourcing project is now ready with milestones defined!";
+                    responseText += "\n\n🔍 **Next Step:** Finding relevant suppliers for your project...";
 
                     await turnContext.SendActivityAsync(responseText);
-                    return $"Successfully added {addedMilestonesCount} milestones to engagement {engagementId}";
+                    
+                    // Let the AI system handle the automatic progression to findSuppliers
+                    // The updated prompt will ensure findSuppliers is called automatically
+                    
+                    return $"Successfully added {addedMilestonesCount} milestones to engagement {engagementId}. Ready to find suppliers.";
                 }
                 else
                 {
-                    // Store failed API response
-                    state.User.AddApiResponse("upsertMilestones", WorkflowStep.MILESTONES_CREATED, response, null, false, "Failed to parse milestone upsert response");
+                    // API response history storage removed to prevent serialization issues
                     
                     _logger.LogError("Failed to parse milestone upsert response: {Response}", response);
                     await turnContext.SendActivityAsync("❌ Failed to add milestones. Please try again or contact support.");
@@ -179,8 +186,7 @@ namespace MyM365Agent1.Actions
             }
             catch (Exception ex)
             {
-                // Store exception in API response history
-                state.User.AddApiResponse("upsertMilestones", WorkflowStep.MILESTONES_CREATED, "", null, false, ex.Message);
+                // API response history storage removed to prevent serialization issues
                 
                 _logger.LogError(ex, "Error upserting milestones");
                 state.User.LastError = ex.Message;
@@ -249,6 +255,42 @@ namespace MyM365Agent1.Actions
                 }
             }
 
+            // Pattern 4: Colon-separated format with "Date :" prefix
+            // 1: milestone title, Date : 2025-10-15; 2: another milestone, Date : 2025-10-20
+            var colonPattern = @"(\d+):\s*([^,]+),\s*Date\s*:\s*(\d{4}-\d{2}-\d{2})";
+            var colonMatches = Regex.Matches(input, colonPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+            foreach (Match match in colonMatches)
+            {
+                var title = match.Groups[2].Value.Trim();
+                if (DateTime.TryParse(match.Groups[3].Value, out var date))
+                {
+                    // Avoid duplicates
+                    if (!milestones.Any(m => m.Title.Equals(title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        milestones.Add(new ProjectMilestone { Title = title, DeliveryDate = date });
+                    }
+                }
+            }
+
+            // Pattern 4: Colon-separated format with "Date :" prefix
+            // 1: milestone title, Date : 2025-10-15; 2: another milestone, Date : 2025-10-20
+            var colonDatePattern = @"(\d+):\s*([^,]+),\s*Date\s*:\s*(\d{4}-\d{2}-\d{2})";
+            var colonDateMatches = Regex.Matches(input, colonDatePattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+            foreach (Match match in colonDateMatches)
+            {
+                var title = match.Groups[2].Value.Trim();
+                if (DateTime.TryParse(match.Groups[3].Value, out var date))
+                {
+                    // Avoid duplicates
+                    if (!milestones.Any(m => m.Title.Equals(title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        milestones.Add(new ProjectMilestone { Title = title, DeliveryDate = date });
+                    }
+                }
+            }
+
             // If no milestones found with patterns, try to extract from a more general approach
             if (!milestones.Any())
             {
@@ -257,7 +299,7 @@ namespace MyM365Agent1.Actions
                 var dateMatches = Regex.Matches(input, datePattern);
 
                 // Split input into sentences/lines and try to match with dates
-                var lines = input.Split(new[] { '\n', '\r', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+                var lines = input.Split(new[] { '\n', '\r', '.', '!', '?', ';' }, StringSplitOptions.RemoveEmptyEntries);
                 
                 foreach (Match dateMatch in dateMatches)
                 {
@@ -271,7 +313,8 @@ namespace MyM365Agent1.Actions
                             // Extract title by removing the date and cleaning up
                             var title = relevantLine.Replace(dateStr, "").Trim();
                             title = Regex.Replace(title, @"[-–—]\s*$", "").Trim(); // Remove trailing dashes
-                            title = Regex.Replace(title, @"^\s*[•\-\*\d+[.)]]\s*", "").Trim(); // Remove leading bullets/numbers
+                            title = Regex.Replace(title, @"^\s*[•\-\*\d+[.):]\s*", "").Trim(); // Remove leading bullets/numbers
+                            title = Regex.Replace(title, @",\s*Date\s*:\s*$", "", RegexOptions.IgnoreCase).Trim(); // Remove ", Date :"
 
                             if (!string.IsNullOrEmpty(title) && title.Length > 3)
                             {
@@ -288,5 +331,14 @@ namespace MyM365Agent1.Actions
 
             return milestones;
         }
+    }
+
+    /// <summary>
+    /// Simple data class for milestone information to avoid serialization issues with anonymous types
+    /// </summary>
+    public class MilestoneData
+    {
+        public string Title { get; set; } = "";
+        public DateTime DeliveryDate { get; set; }
     }
 }

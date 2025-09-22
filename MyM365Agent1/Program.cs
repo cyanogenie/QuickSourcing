@@ -35,21 +35,30 @@ builder.Services.AddHttpClient("SecureApiService", client =>
 // Register Secure API Service with Managed Identity
 builder.Services.AddScoped<ISecureApiServiceHttpClient, SecureApiServiceHttpClient>();
 
-// Register workflow action classes
+// Register workflow actions
 builder.Services.AddScoped<CreateSourcingProjectAction>();
 builder.Services.AddScoped<UpsertMilestonesAction>();
+builder.Services.AddScoped<FindSuppliersAction>();
+builder.Services.AddScoped<ShowSuppliersAction>();
+builder.Services.AddScoped<SelectSuppliersAction>();
+builder.Services.AddScoped<PublishProjectAction>();
+builder.Services.AddScoped<ConfirmPublishAction>();
 builder.Services.AddScoped<ResetWorkflowAction>();
 
 // Register adaptive card actions (kept for compatibility but not imported to AI)
-builder.Services.AddScoped<ShowProjectFormAction>();
-builder.Services.AddScoped<SubmitProjectFormAction>();
-builder.Services.AddScoped<CancelProjectFormAction>();
+// Form-related actions - commented out
+// builder.Services.AddScoped<ShowProjectFormAction>();
+// builder.Services.AddScoped<SubmitProjectFormAction>();
+// builder.Services.AddScoped<CancelProjectFormAction>();
 
 // Register workflow orchestrator
 builder.Services.AddScoped<WorkflowOrchestrator>();
 
 // Register GraphQL Service
 builder.Services.AddHttpClient<IGraphQLService, GraphQLService>();
+
+// Register Supplier Recommendation Service
+builder.Services.AddHttpClient<SupplierRecommendationService>();
 
 // Prepare Configuration for ConfigurationBotFrameworkAuthentication
 var config = builder.Configuration.Get<ConfigOptions>();
@@ -548,7 +557,7 @@ builder.Services.AddTransient<IBot>(sp =>
         turnState.User.LastError = string.Empty;
         turnState.User.LastActivityTime = DateTime.UtcNow;
         turnState.User.StateId = DateTime.UtcNow.ToString("yyyyMMddHHmm");
-        turnState.User.ApiResponseHistory = new List<ApiResponseData>(); // Clear API response history
+        // API response history removed to prevent serialization issues
         
         await turnContext.SendActivityAsync(MessageFactory.Text("🔄 Workflow reset! I'm ready to help you create a new sourcing project."), cancellationToken);
         logger.LogInformation("Workflow reset via /reset command");
@@ -579,63 +588,14 @@ builder.Services.AddTransient<IBot>(sp =>
             $"🔧 **Debug Info:**\n" +
             $"• **State ID:** {turnState.User.StateId ?? "None"}\n" +
             $"• **Last Activity:** {turnState.User.LastActivityTime}\n" +
-            $"• **Last Error:** {turnState.User.LastError ?? "None"}\n" +
-            $"• **API History Count:** {turnState.User.ApiResponseHistory.Count}";
+            $"• **Last Error:** {turnState.User.LastError ?? "None"}";
+            // API History Count removed to prevent serialization issues
 
         await turnContext.SendActivityAsync(MessageFactory.Text(statusText), cancellationToken);
         logger.LogInformation("Status check requested via /status command");
     });
 
-    // Add debug command to view API response history
-    app.OnMessage("/api-history", async (turnContext, turnState, cancellationToken) =>
-    {
-        var apiHistory = turnState.User.ApiResponseHistory;
-        
-        if (!apiHistory.Any())
-        {
-            await turnContext.SendActivityAsync(MessageFactory.Text("📦 **API Response History:** No API responses recorded yet."), cancellationToken);
-            return;
-        }
-
-        var historyText = "📦 **API Response History:**\n\n";
-        
-        foreach (var response in apiHistory.OrderByDescending(r => r.Timestamp))
-        {
-            var status = response.IsSuccess ? "✅ Success" : "❌ Failed";
-            historyText += $"**{response.ActionName}** ({response.Step})\n";
-            historyText += $"• Status: {status}\n";
-            historyText += $"• Time: {response.Timestamp:yyyy-MM-dd HH:mm:ss} UTC\n";
-            
-            if (response.ParsedData.Any())
-            {
-                historyText += "• Data: ";
-                var dataItems = response.ParsedData
-                    .Where(kvp => !string.IsNullOrEmpty(kvp.Value?.ToString()))
-                    .Select(kvp => $"{kvp.Key}={kvp.Value}")
-                    .Take(3); // Limit to first 3 items to avoid long messages
-                historyText += string.Join(", ", dataItems);
-                if (response.ParsedData.Count > 3)
-                    historyText += $" (+{response.ParsedData.Count - 3} more)";
-                historyText += "\n";
-            }
-            
-            if (!response.IsSuccess && !string.IsNullOrEmpty(response.ErrorMessage))
-            {
-                historyText += $"• Error: {response.ErrorMessage}\n";
-            }
-            
-            historyText += "\n";
-        }
-
-        // Limit message length
-        if (historyText.Length > 2000)
-        {
-            historyText = historyText.Substring(0, 1900) + "\n\n... (truncated for length)";
-        }
-
-        await turnContext.SendActivityAsync(MessageFactory.Text(historyText), cancellationToken);
-        logger.LogInformation("API history requested via /api-history command");
-    });
+    // API history debug command removed to prevent serialization issues
 
     // COMMENTED OUT: Explicit message routes for create/new project to always show the form
     // app.OnMessage("create project", async (turnContext, turnState, cancellationToken) =>

@@ -9,6 +9,9 @@ namespace MyM365Agent1.Services
             DateTime engagementStartDate, DateTime engagementEndDate, string engagementId, 
             decimal approxTotalBudget, string requestorAlias);
         Task<string> UpsertMilestonesAsync(string engagementId, List<ProjectMilestone> milestones);
+        Task<string> UpsertProjectSuppliersAsync(string projectId, List<SelectedSupplier> suppliers);
+        Task<string> PublishProjectAsync(int projectId, string projectTitle, string supplierResponseStartDate, 
+            string supplierResponseDueBy, string awardTargetDate);
         Task<string> ExecuteQueryAsync(string query, object? variables = null, string? customBaseUrl = null);
     }
 
@@ -16,6 +19,16 @@ namespace MyM365Agent1.Services
     {
         public string Title { get; set; } = string.Empty;
         public DateTime DeliveryDate { get; set; }
+    }
+
+    public class SelectedSupplier
+    {
+        public string VendorName { get; set; } = string.Empty;
+        public string VendorNumber { get; set; } = string.Empty;
+        public string CompanyCode { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public double Rating { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 
     public class GraphQLService : IGraphQLService
@@ -66,34 +79,80 @@ namespace MyM365Agent1.Services
 
         public async Task<string> UpsertMilestonesAsync(string engagementId, List<ProjectMilestone> milestones)
         {
-            var milestonesJson = string.Join(", ", milestones.Select(m => 
+            var milestonesJson = string.Join("\n\t\t\t\t", milestones.Select(m => 
                 $@"{{ title: ""{m.Title}"", deliveryDate: ""{m.DeliveryDate:yyyy-MM-ddTHH:mm:ss.fffZ}"" }}"));
 
             var query = $@"
                 mutation {{
-                  upsertEngagementInfo(
-                    input: {{input: {{
-                      engagementId: ""{engagementId}""
-                      categoryId: ""18""
-                      categoryName: ""Consulting Services""
-                      sourcingDescription: """"
-                      engagementMilestones: [
-                        {milestonesJson}
-                      ]
-                    }}}}
-                  ) {{
-                    engagementMilestoneResponse {{
-                      engagementId
-                      engagementMilestones {{
-                        title
-                        deliveryDate
-                      }}
-                    }}
-                  }}
-                }}";
+		          upsertEngagementInfo(
+		          input: {{input: {{
+			          engagementId: ""{engagementId}""
+		         categoryId: ""18""
+		         categoryName: ""Consulting Services""
+		         sourcingDescription: """"
+			          engagementMilestones: [
+				        {milestonesJson}
+		        ] }}}}
+		          ) {{
+		          engagementMilestoneResponse {{    engagementId
+
+			        engagementMilestones {{
+			          title
+
+			          deliveryDate
+			        }}
+		          }}}}
+		        }}";
 
             var milestonesUrl = _configuration["GraphQLEndpoints:RFXGeneration:BaseUrl"] + "?tenant=QuickSourcing?action=saveProjectDeliverablesAsync&tenantName=QuickSourcing";
             return await ExecuteQueryAsync(query, null, milestonesUrl);
+        }
+
+        public async Task<string> UpsertProjectSuppliersAsync(string projectId, List<SelectedSupplier> suppliers)
+        {
+            // Use the format that matches SelectSuppliersAction.cs
+            var suppliersList = string.Join(",", suppliers.Select(s => 
+                $"{{vendorNumber:\"{s.VendorNumber}\",companyCode:\"{s.CompanyCode}\"}}"));
+
+            var query = $@"
+                mutation {{
+                    upsertProjectSuppliers(
+                        input: {{
+                            projectId: {projectId},
+                            suppliersList: [{suppliersList}]
+                        }}
+                    ) {{
+                        projectId
+                    }}
+                }}";
+
+            var suppliersUrl = _configuration["GraphQLEndpoints:ProjectManagement:BaseUrl"] + "?tenant=QuickSourcing&action=upsertProjectSuppliers&tenantName=QuickSourcing";
+            return await ExecuteQueryAsync(query, null, suppliersUrl);
+        }
+
+        public async Task<string> PublishProjectAsync(int projectId, string projectTitle, string supplierResponseStartDate, 
+            string supplierResponseDueBy, string awardTargetDate)
+        {
+            var query = $@"
+                mutation {{
+                  publishProject(
+                    input: {{
+                      projectId: {projectId}
+                      projectTitle: ""{projectTitle}""
+                      supplierResponseStartDate: ""{supplierResponseStartDate}""
+                      supplierResponseDueBy: ""{supplierResponseDueBy}""
+                      awardTargetDate: ""{awardTargetDate}""
+                      isReminderMailsEnabled: true
+                      additionalMsContacts: null
+                    }}
+                  ) {{
+                    projectId
+                    projectStatus
+                  }}
+                }}";
+
+            var publishUrl = _configuration["GraphQLEndpoints:ProjectManagement:BaseUrl"] + "?tenant=QuickSourcing&action=publishProject&tenantName=QuickSourcing";
+            return await ExecuteQueryAsync(query, null, publishUrl);
         }
 
         public async Task<string> ExecuteQueryAsync(string query, object? variables = null, string? customBaseUrl = null)
@@ -190,22 +249,8 @@ namespace MyM365Agent1.Services
         /// </summary>
         private string GetBearerTokenForUrl(string url)
         {
-            // Check for project management endpoint
-            var projectMgmtUrl = _configuration["GraphQLEndpoints:ProjectManagement:BaseUrl"];
-            if (!string.IsNullOrEmpty(projectMgmtUrl) && url.Contains(projectMgmtUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                return _configuration["GraphQLEndpoints:ProjectManagement:BearerToken"] ?? string.Empty;
-            }
-
-            // Check for RFX generation endpoint
-            var rfxUrl = _configuration["GraphQLEndpoints:RFXGeneration:BaseUrl"];
-            if (!string.IsNullOrEmpty(rfxUrl) && url.Contains(rfxUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                return _configuration["GraphQLEndpoints:RFXGeneration:BearerToken"] ?? string.Empty;
-            }
-
-            // Fallback to default external API token
-            return _configuration["ExternalApi:BearerToken"] ?? string.Empty;
+            // Use ProjectManagement bearer token for both ProjectManagement and RFXGeneration endpoints
+            return _configuration["GraphQLEndpoints:ProjectManagement:BearerToken"] ?? string.Empty;
         }
     }
 }

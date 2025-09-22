@@ -23,6 +23,17 @@ namespace MyM365Agent1.Actions
             [ActionTurnState] AppState state, 
             [ActionParameters] Dictionary<string, object> parameters)
         {
+            // FORM ACTION DISABLED - This action has been disabled in favor of text-based project creation
+            await turnContext.SendActivityAsync("❌ Form cancellation is disabled. Please use text-based project creation instead. Say 'create project' to get started.");
+            return "Form action disabled - redirected to text-based flow";
+        }
+
+        /* ORIGINAL IMPLEMENTATION COMMENTED OUT
+        public async Task<string> ExecuteAsyncOriginal(
+            [ActionTurnContext] ITurnContext turnContext, 
+            [ActionTurnState] AppState state, 
+            [ActionParameters] Dictionary<string, object> parameters)
+        {
             try
             {
                 _logger.LogInformation("User cancelled project form");
@@ -42,5 +53,6 @@ namespace MyM365Agent1.Actions
                 return "Error handling cancellation";
             }
         }
+        */
     }
 }

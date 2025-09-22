@@ -25,6 +25,12 @@ namespace MyM365Agent1.Actions
             [ActionTurnState] AppState state, 
             [ActionParameters] Dictionary<string, object> parameters)
         {
+            // FORM ACTION DISABLED - This action has been disabled in favor of text-based project creation
+            await turnContext.SendActivityAsync("❌ Form-based project creation is disabled. Please use text-based project creation instead. Say 'create project' to get started.");
+            return "Form action disabled - redirected to text-based flow";
+        }
+            
+            /* ORIGINAL IMPLEMENTATION COMMENTED OUT
             try
             {
                 _logger.LogInformation("🚫 ShowProjectFormAction CALLED but DISABLED - Redirecting to text-based flow");
@@ -219,5 +225,6 @@ You can also provide the details in a more natural way, and I'll extract the inf
                 }
             };
         }
+        */
     }
 }

@@ -181,27 +181,32 @@ namespace MyM365Agent1.Actions
                         state.User.CurrentStep = WorkflowStep.PROJECT_CREATED;
                         state.User.LastActivityTime = DateTime.UtcNow;
 
-                        // Store complete API response in history for cross-step access
-                        state.User.AddApiResponse("createSourcingProject", WorkflowStep.PROJECT_CREATED, response, parsedData, true);
+                        // Store essential data as simple properties to avoid serialization issues
+                        state.User.ProjectTitle = projectDetails.ProjectTitle;
+                        state.User.ProjectDescription = projectDetails.ProjectDescription;
+                        state.User.LastApiResponse = response;
 
                         // Log state update for debugging
                         _logger.LogInformation("🔄 State updated: CurrentStep={CurrentStep}, ProjectId={ProjectId}, EngagementId={EngagementId}, EmailId={EmailId}",
                             state.User.CurrentStep, state.User.ProjectId, state.User.EngagementId, state.User.EmailId);
-                        _logger.LogInformation("📦 API response stored in history for cross-step access");
+                        _logger.LogInformation("📦 Essential project data stored as simple properties");
                         Console.WriteLine($"🔄 State updated: CurrentStep={state.User.CurrentStep}, ProjectId={state.User.ProjectId}, EngagementId={state.User.EngagementId}");
                         Console.WriteLine("📦 API response stored in history for cross-step access");
 
-                        await turnContext.SendActivityAsync($"✅ **Sourcing project created successfully!**\n\n" +
-                            $"📋 **Project Details:**\n" +
-                            $"• **Project ID:** {projectId}\n" +
-                            $"• **Status:** {projectStatus}\n" +
-                            $"• **Title:** {projectDetails.ProjectTitle}\n" +
-                            $"• **Description:** {projectDetails.ProjectDescription}\n" +
-                            $"• **Start Date:** {startDate:yyyy-MM-dd}\n" +
-                            $"• **End Date:** {endDate:yyyy-MM-dd}\n" +
-                            $"• **Budget:** ${budget:N0} USD\n" +
-                            $"• **Engagement ID:** {state.User.EngagementId}\n\n" +
-                            $"🎯 **Next Step:** Please provide your project milestones and deliverables.");
+                        await turnContext.SendActivityAsync($"🎉 **Sourcing Project Created Successfully!**\n\n" +
+                            $"┌─────────────────────────────────────────────────────────────┐\n" +
+                            $"│                  � **PROJECT OVERVIEW**                    │\n" +
+                            $"└─────────────────────────────────────────────────────────────┘\n\n" +
+                            $"🆔 **Project ID:** `{projectId}`\n" +
+                            $"📈 **Status:** {projectStatus}\n" +
+                            $"🏷️ **Title:** {projectDetails.ProjectTitle}\n" +
+                            $"📝 **Description:** {projectDetails.ProjectDescription}\n" +
+                            $"📅 **Start Date:** `{startDate:yyyy-MM-dd}`\n" +
+                            $"📅 **End Date:** `{endDate:yyyy-MM-dd}`\n" +
+                            $"💰 **Budget:** `${budget:N0} USD`\n" +
+                            $"🔗 **Engagement ID:** `{state.User.EngagementId}`\n\n" +
+                            $"─────────────────────────────────────────────────────────────\n\n" +
+                            $"🎯 **Next Step:** Please provide your project milestones and deliverables to continue the setup process.");
 
                         _logger.LogInformation("✅ Project creation completed successfully. State should be persisted automatically.");
                         Console.WriteLine("✅ Project creation completed successfully. State should be persisted automatically.");
@@ -210,9 +215,6 @@ namespace MyM365Agent1.Actions
                     }
                     else
                     {
-                        // Store failed API response
-                        state.User.AddApiResponse("createSourcingProject", WorkflowStep.PROJECT_TO_BE_CREATED, response, null, false, "Project ID not found in response");
-                        
                         _logger.LogError("Project ID not found in response: {Response}", response);
                         await turnContext.SendActivityAsync("❌ Failed to create the sourcing project - no project ID returned. Please try again or contact support.");
                         return "Failed to create sourcing project - no project ID";

@@ -11,8 +11,9 @@ namespace MyM365Agent1.Model
         PROJECT_TO_BE_CREATED,  // Order: 1 - Default state, sourcing project needs to be created
         PROJECT_CREATED,        // Order: 2 - Project created, now collecting milestone details
         MILESTONES_CREATED,     // Order: 3 - Milestones added, ready for supplier selection
-        SUPPLIERS_SELECTED,     // Order: 4 - Suppliers selected, ready for publishing
-        PUBLISHED,              // Order: 5 - Project published and complete
+        SUPPLIERS_FOUND,        // Order: 4 - Suppliers found, ready for selection
+        SUPPLIERS_SELECTED,     // Order: 5 - Suppliers selected, ready for publishing
+        PUBLISHED,              // Order: 6 - Project published and complete
         Error
     }
 
@@ -88,20 +89,6 @@ namespace MyM365Agent1.Model
     {
         public string Title { get; set; }
         public string Description { get; set; }
-    }
-
-    /// <summary>
-    /// Represents an API response with metadata for cross-step data flow
-    /// </summary>
-    public class ApiResponseData
-    {
-        public string ActionName { get; set; } = string.Empty;
-        public WorkflowStep Step { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string RawResponse { get; set; } = string.Empty;
-        public Dictionary<string, object> ParsedData { get; set; } = new();
-        public bool IsSuccess { get; set; }
-        public string ErrorMessage { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -279,93 +266,36 @@ namespace MyM365Agent1.Model
         }
 
         /// <summary>
-        /// API response history for cross-step data flow
+        /// Store essential workflow data as simple strings to avoid serialization issues
         /// </summary>
-        public List<ApiResponseData> ApiResponseHistory
+        public string ProjectTitle
         {
-            get => Get<List<ApiResponseData>>("apiResponseHistory") ?? new List<ApiResponseData>();
-            set => Set("apiResponseHistory", value);
+            get => Get<string>("projectTitle") ?? string.Empty;
+            set => Set("projectTitle", value);
         }
 
-        /// <summary>
-        /// Get API response data from a specific action/step
-        /// </summary>
-        public ApiResponseData GetApiResponse(string actionName)
+        public string ProjectDescription
         {
-            return ApiResponseHistory
-                .Where(r => r.ActionName.Equals(actionName, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(r => r.Timestamp)
-                .FirstOrDefault();
+            get => Get<string>("projectDescription") ?? string.Empty;
+            set => Set("projectDescription", value);
         }
 
-        /// <summary>
-        /// Get API response data from a specific workflow step
-        /// </summary>
-        public ApiResponseData GetApiResponse(WorkflowStep step)
+        public string MilestonesJson
         {
-            return ApiResponseHistory
-                .Where(r => r.Step == step)
-                .OrderByDescending(r => r.Timestamp)
-                .FirstOrDefault();
+            get => Get<string>("milestonesJson") ?? string.Empty;
+            set => Set("milestonesJson", value);
         }
 
-        /// <summary>
-        /// Add API response data to history
-        /// </summary>
-        public void AddApiResponse(string actionName, WorkflowStep step, string rawResponse, 
-            Dictionary<string, object> parsedData = null, bool isSuccess = true, string errorMessage = "")
+        public string SuppliersJson
         {
-            var apiHistory = ApiResponseHistory;
-            apiHistory.Add(new ApiResponseData
-            {
-                ActionName = actionName,
-                Step = step,
-                Timestamp = DateTime.UtcNow,
-                RawResponse = rawResponse,
-                ParsedData = parsedData ?? new Dictionary<string, object>(),
-                IsSuccess = isSuccess,
-                ErrorMessage = errorMessage
-            });
-            
-            // Keep only the last 10 responses to avoid excessive storage
-            if (apiHistory.Count > 10)
-            {
-                apiHistory = apiHistory.OrderByDescending(r => r.Timestamp).Take(10).ToList();
-            }
-            
-            ApiResponseHistory = apiHistory;
+            get => Get<string>("suppliersJson") ?? string.Empty;
+            set => Set("suppliersJson", value);
         }
 
-        /// <summary>
-        /// Get specific data from the most recent API response of an action
-        /// </summary>
-        public T GetApiResponseValue<T>(string actionName, string key)
+        public string LastApiResponse
         {
-            var response = GetApiResponse(actionName);
-            if (response?.ParsedData != null && response.ParsedData.TryGetValue(key, out var value))
-            {
-                try
-                {
-                    if (value is T directValue)
-                        return directValue;
-                    
-                    if (value is JsonElement jsonElement)
-                    {
-                        if (typeof(T) == typeof(string))
-                            return (T)(object)jsonElement.GetString();
-                        if (typeof(T) == typeof(int))
-                            return (T)(object)jsonElement.GetInt32();
-                        // Add more type conversions as needed
-                    }
-                    
-                    return (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    return default(T);
-                }
-            }
-            return default(T);
+            get => Get<string>("lastApiResponse") ?? string.Empty;
+            set => Set("lastApiResponse", value);
         }
 
         /// <summary>
